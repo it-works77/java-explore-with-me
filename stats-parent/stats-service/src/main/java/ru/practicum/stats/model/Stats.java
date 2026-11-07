@@ -1,9 +1,7 @@
-package model;
+package ru.practicum.stats.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -11,7 +9,9 @@ import java.time.LocalDateTime;
 @Table(name = "stats")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class Stats {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
