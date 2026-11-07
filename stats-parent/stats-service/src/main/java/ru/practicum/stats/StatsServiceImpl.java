@@ -1,5 +1,6 @@
 package ru.practicum.stats;
 
+import org.springframework.transaction.annotation.Transactional;
 import ru.practictum.stats.dto.StatsRequestDto;
 import ru.practictum.stats.dto.StatsResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class StatsServiceImpl implements StatsService {
     private final StatsRepository statsRepository;
 
     @Override
+    @Transactional
     public void save(StatsRequestDto requestDto) {
         log.info("Saving stats: {}", requestDto);
         Stats stats = StatsMapper.mapRequestDtotoStats(requestDto);
@@ -28,6 +30,7 @@ public class StatsServiceImpl implements StatsService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<StatsResponseDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
         log.info("Getting stats from {} to {} for uris {}", start, end, uris);
 
