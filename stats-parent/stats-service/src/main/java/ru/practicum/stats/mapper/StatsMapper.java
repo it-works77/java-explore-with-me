@@ -1,7 +1,7 @@
 package ru.practicum.stats.mapper;
 
-import ru.practictum.stats.dto.StatsRequestDto;
-import ru.practictum.stats.dto.StatsResponseDto;
+import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.StatsResponseDto;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import ru.practicum.stats.model.Stats;

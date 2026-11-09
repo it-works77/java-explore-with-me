@@ -1,7 +1,7 @@
 package ru.practicum.stats;
 
-import ru.practictum.stats.dto.StatsRequestDto;
-import ru.practictum.stats.dto.StatsResponseDto;
+import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.StatsResponseDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;

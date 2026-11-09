@@ -1,8 +1,8 @@
 package ru.practicum.stats;
 
 import org.springframework.transaction.annotation.Transactional;
-import ru.practictum.stats.dto.StatsRequestDto;
-import ru.practictum.stats.dto.StatsResponseDto;
+import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.StatsResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ru.practicum.stats.mapper.StatsMapper;
