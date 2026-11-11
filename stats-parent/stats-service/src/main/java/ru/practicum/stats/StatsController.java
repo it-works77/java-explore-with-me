@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
-@RequestMapping("/stats")
 @RequiredArgsConstructor
 public class StatsController {
     private final StatsService statsService;
