@@ -1,7 +1,8 @@
 package ru.practicum.stats;
 
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.GetStatsRequestDto;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Service;
 import ru.practicum.stats.repository.StatsRepository;
 import ru.practicum.stats.repository.StatsWithHits;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -22,7 +22,7 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     @Transactional
-    public void save(StatsRequestDto requestDto) {
+    public void save(SaveStatsRequestDto requestDto) {
         log.info("Saving stats: {}", requestDto);
         Stats stats = StatsMapper.mapRequestDtotoStats(requestDto);
         statsRepository.save(stats);
@@ -31,24 +31,24 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StatsResponseDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
-        log.info("Getting stats from {} to {} for uris {}", start, end, uris);
+    public List<StatsResponseDto> getStats(GetStatsRequestDto dto) {
+        log.info("Getting stats from {} to {} for uris {}", dto.getStart(), dto.getEnd(), dto.getUris());
 
         List<StatsWithHits> result;
 
-        if (unique) {
+        if (dto.isUnique()) {
             log.info("Getting unique stats");
-            if (uris == null) {
-                result = statsRepository.findAllUniqueBetween(start, end);
+            if (dto.getUris() == null) {
+                result = statsRepository.findAllUniqueBetween(dto.getStart(), dto.getEnd());
             } else {
-                result = statsRepository.findAllUniqueByUrisBetween(start, end, uris);
+                result = statsRepository.findAllUniqueByUrisBetween(dto.getStart(), dto.getEnd(), dto.getUris());
             }
         } else {
             log.info("Getting non-unique stats");
-            if (uris == null) {
-                result = statsRepository.findAllBetween(start, end);
+            if (dto.getUris() == null) {
+                result = statsRepository.findAllBetween(dto.getStart(), dto.getEnd());
             } else {
-                result = statsRepository.findAllByUrisBetween(start, end, uris);
+                result = statsRepository.findAllByUrisBetween(dto.getStart(), dto.getEnd(), dto.getUris());
             }
         }
 

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class StatsRequestDtoTest {
+class SaveStatsRequestDtoTest {
 
     private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -26,7 +26,7 @@ class StatsRequestDtoTest {
 
     @Test
     void shouldDeserializeRequestDto() throws JsonProcessingException {
-        StatsRequestDto dto = OBJECT_MAPPER.readValue(REQUEST_JSON, StatsRequestDto.class);
+        SaveStatsRequestDto dto = OBJECT_MAPPER.readValue(REQUEST_JSON, SaveStatsRequestDto.class);
 
         assertThat(dto.getApp()).isEqualTo(APP);
         assertThat(dto.getUri()).isEqualTo(URI);
@@ -36,7 +36,7 @@ class StatsRequestDtoTest {
 
     @Test
     void shouldSerializeRequestDtoWithDocumentedDateFormat() throws JsonProcessingException {
-        StatsRequestDto dto = StatsRequestDto.builder()
+        SaveStatsRequestDto dto = SaveStatsRequestDto.builder()
                 .app(APP)
                 .uri(URI)
                 .ip(IP)

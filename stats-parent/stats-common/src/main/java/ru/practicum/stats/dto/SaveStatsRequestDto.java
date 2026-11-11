@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class StatsRequestDto {
+public class SaveStatsRequestDto {
     @NotBlank
     private String app;
 

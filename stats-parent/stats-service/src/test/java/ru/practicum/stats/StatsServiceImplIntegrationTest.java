@@ -6,7 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
-import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.GetStatsRequestDto;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 import ru.practicum.stats.repository.StatsRepository;
 
@@ -51,7 +52,7 @@ class StatsServiceImplIntegrationTest {
     void saveOne_getSaved() {
         statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
 
-        List<StatsResponseDto> responseDtos = statsService.getStats(WINDOW_START, WINDOW_END, null, false);
+        List<StatsResponseDto> responseDtos = getStats(WINDOW_START, WINDOW_END, null, false);
 
         assertEquals(1, responseDtos.size());
 
@@ -69,7 +70,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_STATS, URI_TWO, IP_TWO, BASE_TIME.plusMinutes(1))
         );
 
-        List<StatsResponseDto> responseDtos = statsService.getStats(WINDOW_START, WINDOW_END, null, false);
+        List<StatsResponseDto> responseDtos = getStats(WINDOW_START, WINDOW_END, null, false);
 
         assertEquals(2, responseDtos.size());
 
@@ -92,7 +93,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_ONE, IP_THREE, BASE_TIME.plusMinutes(2))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 3L), hits);
     }
@@ -104,7 +105,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_STATS, URI_ONE, IP_ONE, BASE_TIME)
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
 
         assertEquals(Map.of(
                 key(APP_EWM, URI_ONE), 1L,
@@ -119,7 +120,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME)
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
 
         assertEquals(Map.of(
                 key(APP_EWM, URI_ONE), 1L,
@@ -129,10 +130,10 @@ class StatsServiceImplIntegrationTest {
 
     @Test
     void save_sameRecordTwice_doesNotDeduplicate() {
-        StatsRequestDto dto = hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME);
+        SaveStatsRequestDto dto = hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME);
         save(dto, dto);
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 2L), hits);
     }
@@ -149,8 +150,8 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_STATS, URI_TWO, IP_TWO, BASE_TIME)
         );
 
-        Map<String, Long> notUnique = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
-        Map<String, Long> unique = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, true));
+        Map<String, Long> notUnique = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> unique = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, true));
 
         assertEquals(Map.of(
                 key(APP_EWM, URI_ONE), 3L,
@@ -177,7 +178,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_ONE, IP_TWO, BASE_TIME.plusMinutes(2))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, true));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, true));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 2L), hits);
     }
@@ -190,7 +191,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_ONE, IP_TWO, BASE_TIME.plusMinutes(2))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 3L), hits);
     }
@@ -203,7 +204,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME)
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, true));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, true));
 
         assertEquals(Map.of(
                 key(APP_EWM, URI_ONE), 1L,
@@ -220,7 +221,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME.plusMinutes(20))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, true));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, true));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
     }
@@ -235,7 +236,7 @@ class StatsServiceImplIntegrationTest {
         );
 
         Map<String, Long> hits = hitsByAppAndUri(
-                statsService.getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE), false));
+                getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE), false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
     }
@@ -249,7 +250,7 @@ class StatsServiceImplIntegrationTest {
         );
 
         Map<String, Long> hits = hitsByAppAndUri(
-                statsService.getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE, URI_TWO), false));
+                getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE, URI_TWO), false));
 
         assertEquals(Map.of(
                 key(APP_EWM, URI_ONE), 1L,
@@ -261,7 +262,7 @@ class StatsServiceImplIntegrationTest {
     void getStats_unknownUri_returnsEmptyList() {
         statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
 
-        List<StatsResponseDto> responseDtos = statsService.getStats(
+        List<StatsResponseDto> responseDtos = getStats(
                 WINDOW_START, WINDOW_END, List.of("/unknown"), false);
 
         assertNotNull(responseDtos);
@@ -272,7 +273,7 @@ class StatsServiceImplIntegrationTest {
     void getStats_emptyUriList_returnsEmptyList() {
         statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
 
-        List<StatsResponseDto> responseDtos = statsService.getStats(
+        List<StatsResponseDto> responseDtos = getStats(
                 WINDOW_START, WINDOW_END, List.of(), false);
 
         assertNotNull(responseDtos);
@@ -283,7 +284,7 @@ class StatsServiceImplIntegrationTest {
     void getStats_duplicateUrisInFilter_doesNotDuplicateGroups() {
         statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(
+        Map<String, Long> hits = hitsByAppAndUri(getStats(
                 WINDOW_START, WINDOW_END, List.of(URI_ONE, URI_ONE), false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
@@ -297,7 +298,7 @@ class StatsServiceImplIntegrationTest {
         );
 
         Map<String, Long> hits = hitsByAppAndUri(
-                statsService.getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE), false));
+                getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE), false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
     }
@@ -311,7 +312,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_STATS, URI_TWO, IP_THREE, BASE_TIME)
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(
+        Map<String, Long> hits = hitsByAppAndUri(getStats(
                 WINDOW_START, WINDOW_END, List.of(URI_ONE), true));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 2L), hits);
@@ -326,7 +327,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME.plusMinutes(10))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(
+        Map<String, Long> hits = hitsByAppAndUri(getStats(
                 BASE_TIME, BASE_TIME.plusMinutes(10), null, false));
 
         assertEquals(Map.of(
@@ -343,7 +344,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, "/after", IP_ONE, BASE_TIME.plusMinutes(11))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(
+        Map<String, Long> hits = hitsByAppAndUri(getStats(
                 BASE_TIME, BASE_TIME.plusMinutes(10), null, false));
 
         assertEquals(Map.of(key(APP_EWM, "/inside"), 1L), hits);
@@ -356,7 +357,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME.plusSeconds(1))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(BASE_TIME, BASE_TIME, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(BASE_TIME, BASE_TIME, null, false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
     }
@@ -365,7 +366,7 @@ class StatsServiceImplIntegrationTest {
     void getStats_startAfterEnd_returnsEmptyList() {
         statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
 
-        List<StatsResponseDto> responseDtos = statsService.getStats(
+        List<StatsResponseDto> responseDtos = getStats(
                 BASE_TIME.plusHours(1), BASE_TIME, null, false);
 
         assertNotNull(responseDtos);
@@ -374,7 +375,7 @@ class StatsServiceImplIntegrationTest {
 
     @Test
     void getStats_noRecordsInRange_returnsEmptyList() {
-        List<StatsResponseDto> responseDtos = statsService.getStats(WINDOW_START, WINDOW_END, null, false);
+        List<StatsResponseDto> responseDtos = getStats(WINDOW_START, WINDOW_END, null, false);
 
         assertNotNull(responseDtos);
         assertTrue(responseDtos.isEmpty());
@@ -389,7 +390,7 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME.plusHours(2))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(BASE_TIME, BASE_TIME, null, false));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(BASE_TIME, BASE_TIME, null, false));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 1L), hits);
     }
@@ -402,17 +403,21 @@ class StatsServiceImplIntegrationTest {
                 hit(APP_EWM, URI_ONE, IP_TWO, BASE_TIME.plusMinutes(2))
         );
 
-        Map<String, Long> hits = hitsByAppAndUri(statsService.getStats(WINDOW_START, WINDOW_END, null, true));
+        Map<String, Long> hits = hitsByAppAndUri(getStats(WINDOW_START, WINDOW_END, null, true));
 
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 2L), hits);
     }
 
-    private void save(StatsRequestDto... hits) {
+    private List<StatsResponseDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
+        return statsService.getStats(new GetStatsRequestDto(start, end, uris, unique));
+    }
+
+    private void save(SaveStatsRequestDto... hits) {
         Arrays.stream(hits).forEach(statsService::save);
     }
 
-    private static StatsRequestDto hit(String app, String uri, String ip, LocalDateTime timestamp) {
-        return StatsRequestDto.builder()
+    private static SaveStatsRequestDto hit(String app, String uri, String ip, LocalDateTime timestamp) {
+        return SaveStatsRequestDto.builder()
                 .app(app)
                 .uri(uri)
                 .ip(ip)

@@ -1,6 +1,7 @@
 package ru.practicum.stats;
 
-import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.GetStatsRequestDto;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class StatsController {
 
     @PostMapping("/hit")
     @ResponseStatus(HttpStatus.CREATED)
-    public void save(@Valid @RequestBody StatsRequestDto requestDto) {
+    public void save(@Valid @RequestBody SaveStatsRequestDto requestDto) {
         statsService.save(requestDto);
     }
 
@@ -29,6 +30,6 @@ public class StatsController {
                                            @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
                                            @RequestParam(required = false) List<String> uris,
                                            @RequestParam(defaultValue = "false") boolean unique) {
-        return statsService.getStats(start, end, uris, unique);
+        return statsService.getStats(new GetStatsRequestDto(start, end, uris, unique));
     }
 }

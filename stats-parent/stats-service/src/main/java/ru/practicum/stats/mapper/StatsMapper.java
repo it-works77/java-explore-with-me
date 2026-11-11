@@ -1,6 +1,6 @@
 package ru.practicum.stats.mapper;
 
-import ru.practicum.stats.dto.StatsRequestDto;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -9,7 +9,7 @@ import ru.practicum.stats.repository.StatsWithHits;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class StatsMapper {
-    public static Stats mapRequestDtotoStats(StatsRequestDto dto) {
+    public static Stats mapRequestDtotoStats(SaveStatsRequestDto dto) {
         return Stats.builder()
                 .app(dto.getApp())
                 .uri(dto.getUri())
