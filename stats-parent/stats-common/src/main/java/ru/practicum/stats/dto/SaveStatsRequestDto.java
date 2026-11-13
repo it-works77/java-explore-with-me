@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import ru.practicum.stats.api.StatsApiConfig;
 
 import java.time.LocalDateTime;
 
@@ -26,7 +27,7 @@ public class SaveStatsRequestDto {
     private String ip;
 
     @PastOrPresent
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = StatsApiConfig.DATE_TIME_PATTERN)
     @NotNull
     private LocalDateTime timestamp;
 }

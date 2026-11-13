@@ -9,8 +9,8 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 public class GetStatsRequestDto {
-    LocalDateTime start;
-    LocalDateTime end;
-    List<String> uris;
-    boolean unique;
+    private LocalDateTime start;
+    private LocalDateTime end;
+    private List<String> uris;
+    private boolean unique;
 }

@@ -1,5 +1,6 @@
 package ru.practicum.stats;
 
+import ru.practicum.stats.api.StatsApiConfig;
 import ru.practicum.stats.dto.GetStatsRequestDto;
 import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
@@ -25,9 +26,9 @@ public class StatsController {
 
     @GetMapping("/stats")
     public List<StatsResponseDto> getStats(@RequestParam
-                                           @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime start,
+                                           @DateTimeFormat(pattern = StatsApiConfig.DATE_TIME_PATTERN) LocalDateTime start,
                                            @RequestParam
-                                           @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime end,
+                                           @DateTimeFormat(pattern = StatsApiConfig.DATE_TIME_PATTERN) LocalDateTime end,
                                            @RequestParam(required = false) List<String> uris,
                                            @RequestParam(defaultValue = "false") boolean unique) {
         return statsService.getStats(new GetStatsRequestDto(start, end, uris, unique));
