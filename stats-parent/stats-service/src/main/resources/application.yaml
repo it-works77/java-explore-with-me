@@ -28,7 +28,7 @@ spring:
 logging:
   level:
     root: INFO
-    "ru.practicum.shareit": INFO
+    "ru.practicum.stats": INFO
     org.springframework.orm.jpa: INFO
     org.springframework.transaction: INFO
     org.springframework.transaction.interceptor: TRACE
