@@ -1,0 +1,9 @@
+# Профиль test включается surefire в корневом pom.xml (spring.profiles.active=test),
+# в тестах дополнительно стоит @ActiveProfiles("test") — чтобы конфигурация
+# подхватывалась и при запуске класса из IDE.
+spring:
+  datasource:
+    url: jdbc:h2:mem:ewm_stats;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
