@@ -76,15 +76,16 @@ class StatsServiceImplIntegrationTest {
 
         assertEquals(2, responseDtos.size());
 
+        // сортировка по убыванию просмотров: группа с двумя хитами идёт первой
         StatsResponseDto responseDto1 = responseDtos.getFirst();
-        assertEquals(APP_EWM, responseDto1.getApp());
-        assertEquals(URI_ONE, responseDto1.getUri());
-        assertEquals(1L, responseDto1.getHits());
+        assertEquals(APP_STATS, responseDto1.getApp());
+        assertEquals(URI_TWO, responseDto1.getUri());
+        assertEquals(2L, responseDto1.getHits());
 
         StatsResponseDto responseDto2 = responseDtos.getLast();
-        assertEquals(APP_STATS, responseDto2.getApp());
-        assertEquals(URI_TWO, responseDto2.getUri());
-        assertEquals(2L, responseDto2.getHits());
+        assertEquals(APP_EWM, responseDto2.getApp());
+        assertEquals(URI_ONE, responseDto2.getUri());
+        assertEquals(1L, responseDto2.getHits());
     }
 
     @Test
@@ -381,6 +382,78 @@ class StatsServiceImplIntegrationTest {
 
         assertNotNull(responseDtos);
         assertTrue(responseDtos.isEmpty());
+    }
+
+    // ---------- сортировка ----------
+
+    @Test
+    void getStats_sortedByHitsDescending() {
+        save(
+                hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_TWO, BASE_TIME),
+                hit(APP_EWM, URI_TEN, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_TEN, IP_TWO, BASE_TIME),
+                hit(APP_EWM, URI_TEN, IP_THREE, BASE_TIME)
+        );
+
+        List<Long> hits = getStats(WINDOW_START, WINDOW_END, null, false).stream()
+                .map(StatsResponseDto::getHits)
+                .toList();
+
+        assertEquals(List.of(3L, 2L, 1L), hits);
+    }
+
+    @Test
+    void getStats_uniqueTrue_sortedByDistinctIpsDescending() {
+        save(
+                hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME.plusMinutes(1)),
+                hit(APP_EWM, URI_ONE, IP_TWO, BASE_TIME.plusMinutes(2)),
+                hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_TWO, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_THREE, BASE_TIME)
+        );
+
+        List<Long> hits = getStats(WINDOW_START, WINDOW_END, null, true).stream()
+                .map(StatsResponseDto::getHits)
+                .toList();
+
+        assertEquals(List.of(3L, 2L), hits);
+    }
+
+    @Test
+    void getStats_withUriFilter_sortedByHitsDescending() {
+        save(
+                hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_ONE, IP_TWO, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME)
+        );
+
+        List<String> uris = getStats(WINDOW_START, WINDOW_END, List.of(URI_ONE, URI_TWO), false).stream()
+                .map(StatsResponseDto::getUri)
+                .toList();
+
+        assertEquals(List.of(URI_ONE, URI_TWO), uris);
+    }
+
+    @Test
+    void getStats_sameHits_orderedByAppThenUri() {
+        save(
+                hit(APP_STATS, URI_ONE, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_TWO, IP_ONE, BASE_TIME),
+                hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME)
+        );
+
+        List<String> keys = getStats(WINDOW_START, WINDOW_END, null, false).stream()
+                .map(dto -> key(dto.getApp(), dto.getUri()))
+                .toList();
+
+        assertEquals(List.of(
+                key(APP_EWM, URI_ONE),
+                key(APP_EWM, URI_TWO),
+                key(APP_STATS, URI_ONE)
+        ), keys);
     }
 
     // ---------- маппинг ----------
