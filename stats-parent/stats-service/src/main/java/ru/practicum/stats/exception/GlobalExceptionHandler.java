@@ -1,5 +1,7 @@
 package ru.practicum.stats.exception;
 
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.practicum.stats.dto.ErrorResponse;
 import ru.practicum.stats.dto.ValidationErrorResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +46,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    @ExceptionHandler(InvalidStatsPeriodException.class)
+    public ResponseEntity<ValidationErrorResponse> handleInvalidPeriod(InvalidStatsPeriodException ex) {
+        ValidationErrorResponse body = ValidationErrorResponse.builder()
+                .error("Ошибка валидации")
+                .errors(Map.of("start", ex.getMessage()))
+                .build();
+
+        log.warn("Некорректный период запроса: start={}, end={}", ex.getStart(), ex.getEnd());
+        return ResponseEntity.badRequest().body(body);
+    }
+
     @ExceptionHandler(MissingServletRequestParameterException.class)
     public ResponseEntity<ErrorResponse> handleMissingRequestParam(MissingServletRequestParameterException ex) {
         ErrorResponse body = ErrorResponse.builder()
@@ -55,11 +68,35 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(body);
     }
 
+    // Обработка 405 Method Not Allowed
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        ErrorResponse body = ErrorResponse.builder()
+                .error("Неверный метод запроса")
+                .details(ex.getMessage())
+                .build();
+        log.warn("Метод не поддерживается: {}", ex.getMethod());
+        log.debug("Метод не поддерживается", ex);
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
+    }
+
+    // Обработка 404 Not Found
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        ErrorResponse body = ErrorResponse.builder()
+                .error("Неверный путь запроса")
+                .details(ex.getResourcePath())
+                .build();
+        log.warn("Неверный путь запроса: {}", ex.getResourcePath());
+        log.debug("Неверный путь запроса", ex);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleAllErrors(Exception ex) {
         ErrorResponse body = ErrorResponse.builder()
-                .error("Внутренняя ошибка сервера")
-                .details(ex.getMessage())
+                .error("Ошибка сервера")
+                .details("Внутренняя ошибка сервера")
                 .build();
         log.error("Внутренняя ошибка сервера: {}", ex.getMessage());
         log.debug("Внутренняя ошибка сервера:", ex);

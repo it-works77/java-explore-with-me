@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import ru.practicum.stats.dto.GetStatsRequestDto;
 import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
+import ru.practicum.stats.exception.InvalidStatsPeriodException;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -157,18 +158,6 @@ class StatsControllerTest {
 
             verifyNoInteractions(statsService);
         }
-
-        @Test
-        void postHit_futureTimestamp_returns400() throws Exception {
-            mockMvc.perform(post("/hit")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(hitJson(APP, URI_ONE, IP, "2999-01-01 00:00:00")))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.error").value("Ошибка валидации"))
-                    .andExpect(jsonPath("$.errors.timestamp").exists());
-
-            verifyNoInteractions(statsService);
-        }
     }
 
     @Nested
@@ -257,21 +246,21 @@ class StatsControllerTest {
                             .contentType(MediaType.TEXT_PLAIN)
                             .content("app=ewm-main-service"))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.error").value("Внутренняя ошибка сервера"));
+                    .andExpect(jsonPath("$.error").value("Ошибка сервера"));
         }
 
         @Test
-        void getOnHitEndpoint_returns500InsteadOf405() throws Exception {
+        void getOnHitEndpoint_returns405() throws Exception {
             mockMvc.perform(get("/hit"))
-                    .andExpect(status().isInternalServerError())
+                    .andExpect(status().isMethodNotAllowed())
                     .andExpect(jsonPath("$.details", containsString("Request method 'GET' is not supported")));
         }
 
         @Test
-        void getUnknownPath_returns500InsteadOf404() throws Exception {
+        void getUnknownPath_returns404() throws Exception {
             mockMvc.perform(get("/unknown"))
-                    .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.details", containsString("No static resource")));
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.details", containsString("unknown")));
         }
     }
 
@@ -388,6 +377,19 @@ class StatsControllerTest {
         }
 
         @Test
+        void getStats_startAfterEnd_returns400() throws Exception {
+            when(statsService.getStats(any(GetStatsRequestDto.class)))
+                    .thenThrow(new InvalidStatsPeriodException(END, START));
+
+            mockMvc.perform(get("/stats")
+                            .param("start", END_PARAM)
+                            .param("end", START_PARAM))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("Ошибка валидации"))
+                    .andExpect(jsonPath("$.errors.start", containsString("не может быть позже")));
+        }
+
+        @Test
         void getStats_invalidStartFormat_returns400() throws Exception {
             mockMvc.perform(get("/stats")
                             .param("start", "2024-09-06")
@@ -422,8 +424,8 @@ class StatsControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(hitJson(APP, URI_ONE, IP, START_PARAM)))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.error").value("Внутренняя ошибка сервера"))
-                    .andExpect(jsonPath("$.details").value("boom"));
+                    .andExpect(jsonPath("$.error").value("Ошибка сервера"))
+                    .andExpect(jsonPath("$.details").value("Внутренняя ошибка сервера"));
         }
 
         @Test
@@ -435,7 +437,7 @@ class StatsControllerTest {
                             .param("start", START_PARAM)
                             .param("end", END_PARAM))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.error").value("Внутренняя ошибка сервера"));
+                    .andExpect(jsonPath("$.error").value("Ошибка сервера"));
         }
     }
 

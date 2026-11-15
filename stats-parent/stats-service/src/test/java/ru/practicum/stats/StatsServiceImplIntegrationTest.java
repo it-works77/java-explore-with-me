@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.stats.dto.GetStatsRequestDto;
 import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
+import ru.practicum.stats.exception.InvalidStatsPeriodException;
 import ru.practicum.stats.repository.StatsRepository;
 
 import java.time.LocalDateTime;
@@ -18,9 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @Transactional
 @ActiveProfiles("test")
@@ -366,14 +365,12 @@ class StatsServiceImplIntegrationTest {
     }
 
     @Test
-    void getStats_startAfterEnd_returnsEmptyList() {
-        statsService.save(hit(APP_EWM, URI_ONE, IP_ONE, BASE_TIME));
+    void getStats_startAfterEnd_throws() {
+        InvalidStatsPeriodException ex = assertThrows(InvalidStatsPeriodException.class,
+                () -> getStats(WINDOW_END, WINDOW_START, null, false));
 
-        List<StatsResponseDto> responseDtos = getStats(
-                BASE_TIME.plusHours(1), BASE_TIME, null, false);
-
-        assertNotNull(responseDtos);
-        assertTrue(responseDtos.isEmpty());
+        assertEquals(WINDOW_END, ex.getStart());
+        assertEquals(WINDOW_START, ex.getEnd());
     }
 
     @Test
@@ -483,6 +480,7 @@ class StatsServiceImplIntegrationTest {
         assertEquals(Map.of(key(APP_EWM, URI_ONE), 2L), hits);
     }
 
+    // ---------- вспомогательные методы ----------
     private List<StatsResponseDto> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, boolean unique) {
         return statsService.getStats(new GetStatsRequestDto(start, end, uris, unique));
     }

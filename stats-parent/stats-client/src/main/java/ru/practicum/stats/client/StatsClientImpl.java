@@ -79,7 +79,7 @@ public final class StatsClientImpl implements StatsClient {
             throw new StatsClientException("stats-service rejected POST hit request for uri " + dto.getUri()
                     + " with status " + e.getStatusCode().value() + " and body " + e.getResponseBodyAsString(), e);
         } catch (RestClientException e) {
-            throw new StatsClientException("Failed to send hit to" + dto.getUri(), e);
+            throw new StatsClientException("Failed to send hit to uri: " + dto.getUri(), e);
         }
     }
 

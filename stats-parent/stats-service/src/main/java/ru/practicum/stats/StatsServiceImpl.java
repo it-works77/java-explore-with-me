@@ -6,6 +6,7 @@ import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import ru.practicum.stats.exception.InvalidStatsPeriodException;
 import ru.practicum.stats.mapper.StatsMapper;
 import ru.practicum.stats.model.Stats;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,10 @@ public class StatsServiceImpl implements StatsService {
     @Transactional(readOnly = true)
     public List<StatsResponseDto> getStats(GetStatsRequestDto dto) {
         log.info("Getting stats from {} to {} for uris {}", dto.getStart(), dto.getEnd(), dto.getUris());
+
+        if (dto.getStart().isAfter(dto.getEnd())) {
+            throw new InvalidStatsPeriodException(dto.getStart(), dto.getEnd());
+        }
 
         List<StatsWithHits> result;
 
