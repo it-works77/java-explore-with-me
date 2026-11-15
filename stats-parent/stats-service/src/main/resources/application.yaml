@@ -6,7 +6,6 @@ spring:
   main.banner-mode: OFF
 
   jpa:
-    show-sql: true
     hibernate:
       ddl-auto: none
     properties:
@@ -31,5 +30,3 @@ logging:
     "ru.practicum.stats": INFO
     org.springframework.orm.jpa: INFO
     org.springframework.transaction: INFO
-    org.springframework.transaction.interceptor: TRACE
-    org.springframework.orm.jpa.JpaTransactionManager: DEBUG
