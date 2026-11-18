@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class UserCreateRequestDto {
     @NotBlank
-    @Size(min = 2, max = 255)
+    @Size(min = 2, max = 250)
     private String name;
     @NotBlank
     @Email
-    @Size(min = 6, max = 255)
+    @Size(min = 6, max = 254)
     private String email;
 }

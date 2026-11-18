@@ -58,7 +58,6 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public List<UserResponseDto> getAllWithPagination(int offset, int size) {
         log.info("Get users with pagination: offset={}, size={}", offset, size);
-        // TODO implement validation in controller
 
         return userRepository.findAll(offset, size).stream()
                 .map(UserMapper::mapUserProjectionToUserResponseDto)

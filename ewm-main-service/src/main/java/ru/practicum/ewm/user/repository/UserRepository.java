@@ -11,7 +11,7 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
 
-    @Query(value = "SELECT u.id, u.name, u.email " +
+    @Query(value = "SELECT u.id as id, u.name as name, u.email as email " +
             "FROM users u " +
             "ORDER BY u.id " +
             "LIMIT :size OFFSET :offset", nativeQuery = true)

@@ -27,6 +27,6 @@ spring:
 logging:
   level:
     root: INFO
-    ru.practicum.stats: INFO
+    ru.practicum.ewm: INFO
     org.springframework.orm.jpa: INFO
     org.springframework.transaction: INFO

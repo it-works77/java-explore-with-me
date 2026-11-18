@@ -27,13 +27,18 @@ public class UserController {
         return userService.add(userCreateRequestDto);
     }
 
-    @GetMapping("")
+    @GetMapping
     public List<UserResponseDto> get(@RequestParam(required = false) List<@Positive Long> ids,
                                      @RequestParam(required = false) @PositiveOrZero Integer from,
                                      @RequestParam(required = false) @Positive Integer size) {
         if (ids != null) {
+            if (from != null || size != null) {
+                throw new IllegalRequestParamException("Если задан ids, from и size не должны быть заданы");
+            }
+
             return userService.getAllByIds(ids);
         }
+
         if (from != null && size != null) {
             return userService.getAllWithPagination(from, size);
         }
