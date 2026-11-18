@@ -32,10 +32,7 @@ public class UserController {
                                      @RequestParam(required = false) @PositiveOrZero Integer from,
                                      @RequestParam(required = false) @Positive Integer size) {
         if (ids != null) {
-            if (from != null || size != null) {
-                throw new IllegalRequestParamException("Если задан ids, from и size не должны быть заданы");
-            }
-
+            // Игнорируем from и size, если ids заданы
             return userService.getAllByIds(ids);
         }
 
