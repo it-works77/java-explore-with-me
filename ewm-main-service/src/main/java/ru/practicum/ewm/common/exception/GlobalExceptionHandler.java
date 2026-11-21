@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -85,6 +86,17 @@ public class GlobalExceptionHandler {
 
         return createErrorResponse(HttpStatus.BAD_REQUEST,
                 "Ошибка парсинга запроса",
+                ex.getMessage());
+    }
+
+    @ExceptionHandler({HttpRequestMethodNotSupportedException.class})
+    public ResponseEntity<ErrorResponse> handleHttpRequestMethodNotSupportedErrors(Exception ex) {
+
+        log.warn("Метод не поддерживается: {}", ex.getMessage());
+        log.debug("Метод не поддерживается", ex);
+
+        return createErrorResponse(HttpStatus.METHOD_NOT_ALLOWED,
+                "Метод не поддерживается",
                 ex.getMessage());
     }
 
