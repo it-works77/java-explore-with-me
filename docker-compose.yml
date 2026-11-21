@@ -34,21 +34,38 @@ services:
     restart: unless-stopped
 
   ewm-service:
-    # TODO: снять profiles, когда сервис будет готов подниматься в CI
-    # (свой datasource на ewm-db, схема, порт 8080).
-    # Пока он не стартует, а CI на ветке stat_svc делает `docker compose up --detach`
-    # без аргументов — без профиля шаг падал бы на запуске ewm-service.
-    profiles: ["main"]
     build:
       context: .
       dockerfile: ewm-main-service/Dockerfile
     image: ewm-main-service:latest
     ports:
       - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ewm-db:5432/ewm_main
+      SPRING_DATASOURCE_USERNAME: dbuser
+      # $$ — экранирование $ для compose, в контейнер уходит Qwerty$4.
+      SPRING_DATASOURCE_PASSWORD: "Qwerty$$4"
+    depends_on:
+      # Когда появится бин StatsClient, в ewm-service нужно будет добавить зависимость от stats-server
+      ewm-db:
+        condition: service_healthy
+    restart: unless-stopped
 
   ewm-db:
-    profiles: ["main"]
     image: postgres:16.1
+    environment:
+      POSTGRES_DB: ewm_main
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: "Qwerty$$4"
+    volumes:
+      - ewm-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbuser -d ewm_main"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
 volumes:
   stats-db-data:
+  ewm-db-data:
