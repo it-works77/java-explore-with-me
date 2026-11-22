@@ -36,13 +36,6 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.CONFLICT, "Нарушение уникальности", ex.getMessage());
     }
 
-    @ExceptionHandler(IllegalRequestParamException.class)
-    public ResponseEntity<ErrorResponse> handleIllegalRequestParamException(IllegalRequestParamException ex) {
-        log.warn("Неверный параметр запроса: {}", ex.getMessage());
-        log.debug("Неверный параметр запроса", ex);
-        return createErrorResponse(HttpStatus.BAD_REQUEST, "Неверный параметр запроса", ex.getMessage());
-    }
-
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
         log.warn("Нарушение целостности: {}", ex.getMessage());
@@ -50,6 +43,20 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.CONFLICT,
                 "Нарушение целостности",
                 "Нарушено ограничение целостности данных");
+    }
+
+    @ExceptionHandler(EntityUpdateForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleEntityUpdateForbiddenErrors(EntityUpdateForbiddenException ex) {
+        log.warn("Изменение события невозможно: {}", ex.getMessage());
+        log.debug("Изменение события невозможно", ex);
+        return createErrorResponse(HttpStatus.CONFLICT, "Изменение события невозможно", ex.getMessage());
+    }
+
+    @ExceptionHandler(IllegalRequestParamException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalRequestParamException(IllegalRequestParamException ex) {
+        log.warn("Неверный параметр запроса: {}", ex.getMessage());
+        log.debug("Неверный параметр запроса", ex);
+        return createErrorResponse(HttpStatus.BAD_REQUEST, "Неверный параметр запроса", ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -67,8 +74,8 @@ public class GlobalExceptionHandler {
                 errors);
     }
 
-    @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+    @ExceptionHandler({ConstraintViolationException.class, IllegalArgumentException.class})
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(Exception ex) {
 
         log.warn("Нарушение ограничений параметров: {}", ex.getMessage());
         log.debug("Нарушение ограничений параметров", ex);

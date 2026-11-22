@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.practicum.ewm.common.exception.EntityAlreadyExistsException;
 import ru.practicum.ewm.common.exception.EntityNotFoundException;
 import ru.practicum.ewm.user.dto.UserCreateRequestDto;
-import ru.practicum.ewm.user.dto.UserResponseDto;
+import ru.practicum.ewm.user.dto.UserFullResponseDto;
 import ru.practicum.ewm.user.mapper.UserMapper;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
@@ -22,41 +22,41 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional
-    public UserResponseDto add(UserCreateRequestDto userCreateRequestDto) {
+    public UserFullResponseDto add(UserCreateRequestDto userCreateRequestDto) {
         log.info("Add user: userDto={}", userCreateRequestDto);
         userRepository.findByEmail(userCreateRequestDto.getEmail()).ifPresent(user -> {
             throw new EntityAlreadyExistsException("Пользователь с email=%s уже существует".formatted(user.getEmail()));
         });
 
         User user = userRepository.save(UserMapper.mapUserCreateRequestDtoToUser(userCreateRequestDto));
-        return UserMapper.mapUserToUserResponseDto(user);
+        return UserMapper.mapUserToUserFullResponseDto(user);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public UserResponseDto getById(Long id) {
+    public UserFullResponseDto getById(Long id) {
         log.info("Get user: userId={}", id);
         User user = userRepository.findById(id).orElseThrow(
                 () -> new EntityNotFoundException("Пользователь не найден по id=%s".formatted(id)));
-        return UserMapper.mapUserToUserResponseDto(user);
+        return UserMapper.mapUserToUserFullResponseDto(user);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDto> getAllByIds(List<Long> ids) {
+    public List<UserFullResponseDto> getAllByIds(List<Long> ids) {
         log.info("Get users: userIds={}", ids);
         if (ids.isEmpty()) {
             return List.of();
         }
 
         return userRepository.findAllById(ids).stream()
-                .map(UserMapper::mapUserToUserResponseDto)
+                .map(UserMapper::mapUserToUserFullResponseDto)
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserResponseDto> getAllWithPagination(int offset, int size) {
+    public List<UserFullResponseDto> getAllWithPagination(int offset, int size) {
         log.info("Get users with pagination: offset={}, size={}", offset, size);
 
         return userRepository.findAll(offset, size).stream()
