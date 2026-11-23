@@ -30,3 +30,8 @@ logging:
     ru.practicum.ewm: INFO
     org.springframework.orm.jpa: INFO
     org.springframework.transaction: INFO
+
+stats-service:
+  url: ${STATS_SERVICE_URL:http://localhost:9090}
+  connect-timeout: ${STATS_SERVICE_CONNECT_TIMEOUT:3s}
+  read-timeout: ${STATS_SERVICE_READ_TIMEOUT:5s}
