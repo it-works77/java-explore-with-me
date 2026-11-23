@@ -19,6 +19,7 @@ import ru.practicum.ewm.event.dto.QueryEventPublicRequestDto;
 import ru.practicum.ewm.event.dto.UpdateEventAdminRequestDto;
 import ru.practicum.ewm.event.dto.UpdateEventUserRequestDto;
 import ru.practicum.ewm.event.model.AdminStateAction;
+import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.EventState;
 import ru.practicum.ewm.event.model.UserStateAction;
 import ru.practicum.ewm.event.repository.EventRepository;
@@ -260,9 +261,95 @@ class EventServiceImplIntegrationTest {
         assertThrows(EntityNotFoundException.class, () -> eventService.get(created.getId()));
     }
 
+    @Test
+    void updateByAdmin_publishEvent_setsPublishedOn() {
+        EventFullResponseDto created = eventService.add(initiator.getId(),
+                request("Concert", category, future(7), true));
+
+        LocalDateTime before = LocalDateTime.now();
+        EventFullResponseDto published = eventService.updateByAdmin(created.getId(),
+                UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.PUBLISH_EVENT).build());
+        LocalDateTime after = LocalDateTime.now();
+
+        assertThat(published.getState()).isEqualTo(EventState.PUBLISHED);
+        assertThat(published.getPublishedOn()).isNotNull().isBetween(before, after);
+        assertThat(eventRepository.findById(created.getId()).orElseThrow().getPublishedOn())
+                .isNotNull()
+                .isBetween(before, after);
+    }
+
+    @Test
+    void updateByAdmin_rejectPending_leavesPublishedOnNull() {
+        EventFullResponseDto created = eventService.add(initiator.getId(),
+                request("Concert", category, future(7), true));
+
+        EventFullResponseDto rejected = eventService.updateByAdmin(created.getId(),
+                UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.REJECT_EVENT).build());
+
+        assertThat(rejected.getState()).isEqualTo(EventState.CANCELED);
+        assertThat(rejected.getPublishedOn()).isNull();
+        assertThat(eventRepository.findById(created.getId()).orElseThrow().getPublishedOn()).isNull();
+    }
+
+    @Test
+    void updateByAdmin_publishEventWithDateInTwoHours_publishes() {
+        Event event = savePendingEvent(LocalDateTime.now().plusHours(2));
+
+        EventFullResponseDto published = eventService.updateByAdmin(event.getId(),
+                UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.PUBLISH_EVENT).build());
+
+        assertThat(published.getState()).isEqualTo(EventState.PUBLISHED);
+        assertThat(published.getPublishedOn()).isNotNull();
+    }
+
+    @Test
+    void updateByAdmin_publishEventWithDateSoon_throwsForbidden() {
+        Event event = savePendingEvent(LocalDateTime.now().plusMinutes(30));
+
+        assertThrows(EntityUpdateForbiddenException.class, () -> eventService.updateByAdmin(event.getId(),
+                UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.PUBLISH_EVENT).build()));
+        assertThat(eventRepository.findById(event.getId()).orElseThrow().getState())
+                .isEqualTo(EventState.PENDING);
+    }
+
+    @Test
+    void updateByAdmin_rejectEventWithDateSoon_cancelsEvent() {
+        Event event = savePendingEvent(LocalDateTime.now().plusMinutes(30));
+
+        EventFullResponseDto rejected = eventService.updateByAdmin(event.getId(),
+                UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.REJECT_EVENT).build());
+
+        assertThat(rejected.getState()).isEqualTo(EventState.CANCELED);
+    }
+
+    @Test
+    void updateByAdmin_editTitleOfEventWithDateSoon_updatesTitle() {
+        Event event = savePendingEvent(LocalDateTime.now().plusMinutes(30));
+
+        EventFullResponseDto updated = eventService.updateByAdmin(event.getId(),
+                UpdateEventAdminRequestDto.builder().title("Renamed").build());
+
+        assertThat(updated.getTitle()).isEqualTo("Renamed");
+        assertThat(updated.getState()).isEqualTo(EventState.PENDING);
+    }
+
     private void publish(Long eventId) {
         eventService.updateByAdmin(eventId,
                 UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.PUBLISH_EVENT).build());
+    }
+
+    private Event savePendingEvent(LocalDateTime eventDate) {
+        return eventRepository.save(Event.builder()
+                .title("Soon")
+                .annotation("Достаточно длинная аннотация события")
+                .description("Достаточно длинное описание события для теста")
+                .category(category)
+                .initiator(initiator)
+                .eventDate(eventDate)
+                .latitude(55.75)
+                .longitude(37.62)
+                .requestModeration(true)
+                .build());
     }
 
     private CreateEventRequestDto request(String title, Category eventCategory, LocalDateTime date,

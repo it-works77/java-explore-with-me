@@ -167,22 +167,10 @@ public class EventServiceImpl implements EventService {
         Event existingEvent = eventRepository.findById(eventId).orElseThrow(
                 () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(eventId)));
 
-        // дата начала изменяемого события должна быть не ранее чем за час от даты публикации. (Ожидается код ошибки 409)
-        if (existingEvent.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE))) {
-            throw new EntityUpdateForbiddenException("Событие не может быть изменено: " +
-                    "дата и время на которые намечено событие не может быть раньше, " +
-                    "чем через %s час(а) от текущего момента".formatted(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE));
-        }
-
         Event updatedEvent = updateEventByAdmin(existingEvent, dto);
-        if (updatedEvent.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE))) {
-            throw new EntityUpdateForbiddenException("Событие не может быть изменено: " +
-                    "дата и время на которые намечено событие не может быть раньше, " +
-                    "чем через %s час(а) от текущего момента".formatted(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE));
-        }
-        Event saved = eventRepository.save(updatedEvent);
-        log.debug("Event updated by admin: {}", saved);
-        return EventMapper.mapEventToEventFullResponseDto(saved);
+
+        log.debug("Event updated by admin: {}", updatedEvent);
+        return EventMapper.mapEventToEventFullResponseDto(updatedEvent);
     }
 
     // Public
@@ -327,7 +315,15 @@ public class EventServiceImpl implements EventService {
                     throw new EntityUpdateForbiddenException("Событие не может быть опубликовано: " +
                             "можно опубликовать только события в состоянии ожидания публикации");
                 }
+                LocalDateTime publishedOn = LocalDateTime.now();
+                // «дата начала события не ранее чем за час от даты публикации»
+                if (event.getEventDate().isBefore(publishedOn.plusHours(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE))) {
+                    throw new EntityUpdateForbiddenException("Событие не может быть опубликовано: " +
+                            "дата начала события не может быть раньше, чем через %s час(а) от даты публикации"
+                                    .formatted(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE));
+                }
                 event.setState(EventState.PUBLISHED);
+                event.setPublishedOn(publishedOn);
             }
             // событие можно отклонить, только если оно еще не опубликовано (Ожидается код ошибки 409)
             if (dto.getStateAction() == AdminStateAction.REJECT_EVENT) {

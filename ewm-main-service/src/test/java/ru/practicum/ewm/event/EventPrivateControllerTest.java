@@ -14,6 +14,8 @@ import ru.practicum.ewm.event.dto.EventShortResponseDto;
 
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -23,6 +25,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -174,5 +177,17 @@ class EventPrivateControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Renamed\"}"))
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void get_unexpectedException_returns500WithoutInternals() throws Exception {
+        when(eventService.get(1L, 2L))
+                .thenThrow(new IllegalStateException("secret internals: jdbc:postgresql://db"));
+
+        mockMvc.perform(get("/users/1/events/2"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status").value("INTERNAL_SERVER_ERROR"))
+                .andExpect(jsonPath("$.message").value("Внутренняя ошибка сервера"))
+                .andExpect(content().string(not(containsString("secret internals"))));
     }
 }

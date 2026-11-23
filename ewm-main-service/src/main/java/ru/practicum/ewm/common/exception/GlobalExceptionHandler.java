@@ -112,8 +112,8 @@ public class GlobalExceptionHandler {
         log.error("Внутренняя ошибка сервера: {}", ex.getMessage());
         log.debug("Внутренняя ошибка сервера:", ex);
 
-        // TODO Hide internal details before release
-        return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Внутренняя ошибка сервера", ex.getMessage());
+        return createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Внутренняя ошибка сервера",
+                "Внутренняя ошибка сервера");
     }
 
     private ResponseEntity<ErrorResponse> createErrorResponse(HttpStatus status,
