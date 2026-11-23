@@ -68,6 +68,10 @@ public class EventSpecifications {
                         : root.get("state").in(states);
     }
 
+    public static Specification<Event> byState(EventState state) {
+        return (root, query, cb) -> cb.equal(root.get("state"), state);
+    }
+
     // ===== Только для пользователя =====
 
     public static Specification<Event> byText(String text) {

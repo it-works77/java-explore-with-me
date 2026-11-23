@@ -1,15 +1,11 @@
 package ru.practicum.ewm.event.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.practicum.ewm.event.model.AdminStateAction;
-import ru.practicum.ewm.event.model.UserStateAction;
 import ru.practicum.stats.api.StatsApiConfig;
 
 import java.time.LocalDateTime;
@@ -32,13 +28,11 @@ public class UpdateEventAdminRequestDto {
 
     private LocationDto location;
 
-    private boolean paid;
+    private Boolean paid;
 
-    @Builder.Default
-    private int participantLimit = 0;
+    private Integer participantLimit;
 
-    @Builder.Default
-    private boolean requestModeration = true;
+    private Boolean requestModeration;
 
     private AdminStateAction stateAction;
 }

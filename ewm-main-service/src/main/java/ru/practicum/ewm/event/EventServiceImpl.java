@@ -21,6 +21,7 @@ import ru.practicum.ewm.event.model.AdminStateAction;
 import ru.practicum.ewm.event.model.Event;
 import ru.practicum.ewm.event.model.EventSortType;
 import ru.practicum.ewm.event.model.EventState;
+import ru.practicum.ewm.event.model.UserStateAction;
 import ru.practicum.ewm.event.repository.EventProjection;
 import ru.practicum.ewm.event.repository.EventRepository;
 import ru.practicum.ewm.event.repository.EventSpecifications;
@@ -55,7 +56,7 @@ public class EventServiceImpl implements EventService {
 
         // дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента
         if (dto.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT_DATE))) {
-            throw new IllegalArgumentException("Дата и время на которые намечено событие " +
+            throw new EntityUpdateForbiddenException("Дата и время на которые намечено событие " +
                     "не может быть раньше, чем через два часа от текущего момента");
         }
 
@@ -85,9 +86,9 @@ public class EventServiceImpl implements EventService {
     public List<EventShortResponseDto> searchPublic(Long userId, int offset, int size) {
         log.info("Get all events for user id={} with pagination: offset={}, size={}", userId, offset, size);
         List<EventProjection> eventProjections = eventRepository.findAll(userId, offset, size);
-        // TODO views
-
-        return List.of();
+        return eventProjections.stream()
+                .map(EventMapper::mapEventProjectionToEventShortResponseDto)
+                .toList();
     }
 
     @Override
@@ -114,9 +115,15 @@ public class EventServiceImpl implements EventService {
                     "чем через %S час(а) от текущего момента".formatted(MIN_HOURS_BEFORE_EVENT_DATE));
         }
 
-        Event updatedEvent = eventRepository.save(updateEventByUser(existingEvent, dto));
-        log.debug("Event updated: {}", updatedEvent);
-        return EventMapper.mapEventToEventFullResponseDto(updatedEvent);
+        Event updatedEvent = updateEventByUser(existingEvent, dto);
+        if (updatedEvent.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_HOURS_BEFORE_EVENT_DATE))) {
+            throw new EntityUpdateForbiddenException("Событие не может быть изменено: " +
+                    "дата и время на которые намечено событие не может быть раньше, " +
+                    "чем через %s час(а) от текущего момента".formatted(MIN_HOURS_BEFORE_EVENT_DATE));
+        }
+        Event saved = eventRepository.save(updatedEvent);
+        log.debug("Event updated: {}", saved);
+        return EventMapper.mapEventToEventFullResponseDto(saved);
     }
 
     // Admin
@@ -167,9 +174,15 @@ public class EventServiceImpl implements EventService {
                     "чем через %s час(а) от текущего момента".formatted(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE));
         }
 
-        Event updatedEvent = eventRepository.save(updateEventByAdmin(existingEvent, dto));
-        log.debug("Event updated by admin: {}", updatedEvent);
-        return EventMapper.mapEventToEventFullResponseDto(updatedEvent);
+        Event updatedEvent = updateEventByAdmin(existingEvent, dto);
+        if (updatedEvent.getEventDate().isBefore(LocalDateTime.now().plusHours(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE))) {
+            throw new EntityUpdateForbiddenException("Событие не может быть изменено: " +
+                    "дата и время на которые намечено событие не может быть раньше, " +
+                    "чем через %s час(а) от текущего момента".formatted(MIN_ADMIN_HOURS_BEFORE_EVENT_DATE));
+        }
+        Event saved = eventRepository.save(updatedEvent);
+        log.debug("Event updated by admin: {}", saved);
+        return EventMapper.mapEventToEventFullResponseDto(saved);
     }
 
     // Public
@@ -178,7 +191,11 @@ public class EventServiceImpl implements EventService {
     public List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto) {
         log.info("Get all events");
 
-        Specification<Event> spec = EventSpecifications.combineForUser(dto);
+        Specification<Event> spec = EventSpecifications.combineForUser(dto)
+                .and(EventSpecifications.byState(EventState.PUBLISHED));
+        if (dto.getRangeStart() == null && dto.getRangeEnd() == null) {
+            spec = spec.and(EventSpecifications.byRangeStart(LocalDateTime.now()));
+        }
 
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Event> cq = cb.createQuery(Event.class);
@@ -192,8 +209,8 @@ public class EventServiceImpl implements EventService {
         // === Сортировка на основе dto.getSort() ===
         EventSortType sort = dto.getSort() == null ? EventSortType.EVENT_DATE : dto.getSort();
         switch (sort) {
-            case VIEWS -> cq.orderBy(cb.desc(root.get("views")));
-            case EVENT_DATE -> cq.orderBy(cb.asc(root.get("eventDate")));
+            // views приходят из stats-service и в сущности отсутствуют: до подключения сортируем по дате
+            case VIEWS, EVENT_DATE -> cq.orderBy(cb.asc(root.get("eventDate")));
         }
 
         // Произвольный offset/size через setFirstResult/setMaxResults
@@ -216,6 +233,9 @@ public class EventServiceImpl implements EventService {
         log.info("Get event id={}", eventId);
         Event event = eventRepository.findById(eventId).orElseThrow(
                 () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(eventId)));
+        if (event.getState() != EventState.PUBLISHED) {
+            throw new EntityNotFoundException("Событие не найдено по id=%s".formatted(eventId));
+        }
 
         log.debug("Event found: {}", event);
         return EventMapper.mapEventToEventFullResponseDto(event);
@@ -255,7 +275,12 @@ public class EventServiceImpl implements EventService {
             event.setRequestModeration(dto.getRequestModeration());
         }
 
-        // TODO stateAction
+        if (dto.getStateAction() == UserStateAction.SEND_TO_REVIEW) {
+            event.setState(EventState.PENDING);
+        }
+        if (dto.getStateAction() == UserStateAction.CANCEL_REVIEW) {
+            event.setState(EventState.CANCELED);
+        }
 
         return event;
     }
@@ -284,9 +309,15 @@ public class EventServiceImpl implements EventService {
             event.setLongitude(dto.getLocation().lon());
         }
 
-        event.setPaid(dto.isPaid());
-        event.setParticipantLimit(dto.getParticipantLimit());
-        event.setRequestModeration(dto.isRequestModeration());
+        if (dto.getPaid() != null) {
+            event.setPaid(dto.getPaid());
+        }
+        if (dto.getParticipantLimit() != null) {
+            event.setParticipantLimit(dto.getParticipantLimit());
+        }
+        if (dto.getRequestModeration() != null) {
+            event.setRequestModeration(dto.getRequestModeration());
+        }
 
         // stateAction processing
         if (dto.getStateAction() != null) {
@@ -300,9 +331,9 @@ public class EventServiceImpl implements EventService {
             }
             // событие можно отклонить, только если оно еще не опубликовано (Ожидается код ошибки 409)
             if (dto.getStateAction() == AdminStateAction.REJECT_EVENT) {
-                if (event.getState() != EventState.PUBLISHED) {
+                if (event.getState() == EventState.PUBLISHED) {
                     throw new EntityUpdateForbiddenException("Событие не может быть отклонено: " +
-                            "можно отклонить только события, которые уже опубликованы");
+                            "можно отклонить только события, которые еще не опубликованы");
                 }
                 event.setState(EventState.CANCELED);
             }

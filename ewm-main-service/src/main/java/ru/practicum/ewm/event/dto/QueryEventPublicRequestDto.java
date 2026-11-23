@@ -8,7 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import ru.practicum.ewm.category.dto.CategoryRequestDto;
 import ru.practicum.ewm.event.model.EventSortType;
 import ru.practicum.stats.api.StatsApiConfig;
 

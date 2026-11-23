@@ -38,11 +38,9 @@ public class UpdateEventUserRequestDto {
     private Boolean paid;
 
     @Min(0)
-    @Builder.Default
-    private Integer participantLimit = 0;
+    private Integer participantLimit;
 
-    @Builder.Default
-    private Boolean requestModeration = true;
+    private Boolean requestModeration;
 
     private UserStateAction stateAction;
 }

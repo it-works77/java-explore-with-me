@@ -7,7 +7,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import ru.practicum.ewm.category.dto.CategoryResponseDto;
 import ru.practicum.ewm.event.model.EventState;
-import ru.practicum.ewm.user.dto.UserFullResponseDto;
 import ru.practicum.ewm.user.dto.UserShortResponseDto;
 import ru.practicum.stats.api.StatsApiConfig;
 
