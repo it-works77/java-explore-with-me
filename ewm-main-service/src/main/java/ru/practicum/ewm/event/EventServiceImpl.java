@@ -2,6 +2,7 @@ package ru.practicum.ewm.event;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.persistence.TypedQuery;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Predicate;
@@ -15,6 +16,7 @@ import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.category.repository.CategoryRepository;
 import ru.practicum.ewm.common.exception.EntityNotFoundException;
 import ru.practicum.ewm.common.exception.EntityUpdateForbiddenException;
+import ru.practicum.ewm.common.exception.IllegalRequestParamException;
 import ru.practicum.ewm.event.dto.*;
 import ru.practicum.ewm.event.mapper.EventMapper;
 import ru.practicum.ewm.event.model.AdminStateAction;
@@ -28,11 +30,13 @@ import ru.practicum.ewm.event.repository.EventSpecifications;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
 import ru.practicum.stats.client.StatsClient;
+import ru.practicum.stats.client.exception.StatsClientException;
 import ru.practicum.stats.dto.GetStatsRequestDto;
 import ru.practicum.stats.dto.SaveStatsRequestDto;
 import ru.practicum.stats.dto.StatsResponseDto;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,6 +48,7 @@ public class EventServiceImpl implements EventService {
     private static final int MIN_HOURS_BEFORE_EVENT_DATE = 2;
     private static final int MIN_ADMIN_HOURS_BEFORE_EVENT_DATE = 1;
     private static final String STATS_APP_NAME = "ewm-main-service";
+    private static final LocalDateTime STATS_START = LocalDateTime.of(1970, 1, 1, 0, 0);
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
@@ -187,14 +192,63 @@ public class EventServiceImpl implements EventService {
     public List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto,
                                                     String requestURI,
                                                     String remoteAddr) {
-        log.info("Get all events");
+        log.info("Search published events");
+        validatePublicQuery(dto);
 
         Specification<Event> spec = EventSpecifications.combineForUser(dto)
                 .and(EventSpecifications.byState(EventState.PUBLISHED));
-        if (dto.getRangeStart() == null && dto.getRangeEnd() == null) {
+        if (dto.getRangeStart() == null) {
             spec = spec.and(EventSpecifications.byRangeStart(LocalDateTime.now()));
         }
 
+        EventSortType sort = dto.getSort() == null ? EventSortType.EVENT_DATE : dto.getSort();
+        List<Event> events = findEvents(spec, sort, dto.getFrom(), dto.getSize());
+        log.debug("Events found: {}", events);
+
+        List<EventShortResponseDto> eventsDto = events.stream()
+                .map(EventMapper::mapEventToEventShortResponseDto)
+                .toList();
+
+        if (!events.isEmpty()) {
+            Map<String, Long> views = getViews(events.stream()
+                    .map(event -> buildEventUri(requestURI, event.getId()))
+                    .toList());
+            eventsDto.forEach(event ->
+                    event.setViews(views.getOrDefault(buildEventUri(requestURI, event.getId()), 0L)));
+        }
+
+        if (sort == EventSortType.VIEWS) {
+            eventsDto = eventsDto.stream()
+                    .sorted(Comparator.comparing(EventShortResponseDto::getViews,
+                                    Comparator.nullsLast(Comparator.reverseOrder()))
+                            .thenComparing(EventShortResponseDto::getEventDate))
+                    .skip(dto.getFrom())
+                    .limit(dto.getSize())
+                    .toList();
+        }
+
+        // По спеке запрос к списку сохраняется один раз для самого эндпоинта /events
+        saveHit(requestURI, remoteAddr);
+
+        return eventsDto;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EventFullResponseDto getPublishedEvent(Long id, String requestURI, String remoteAddr) {
+        log.info("Get published event id={} from uri={} and ip={}", id, requestURI, remoteAddr);
+        Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED).orElseThrow(
+                () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(id)));
+
+        EventFullResponseDto eventDto = EventMapper.mapEventToEventFullResponseDto(event);
+        eventDto.setViews(getViews(List.of(requestURI)).getOrDefault(requestURI, 0L));
+
+        saveHit(requestURI, remoteAddr);
+
+        return eventDto;
+    }
+
+    private List<Event> findEvents(Specification<Event> spec, EventSortType sort, int from, int size) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<Event> cq = cb.createQuery(Event.class);
         Root<Event> root = cq.from(Event.class);
@@ -204,84 +258,65 @@ public class EventServiceImpl implements EventService {
         if (predicate != null) {
             cq.where(predicate);
         }
-        // === Сортировка на основе dto.getSort() ===
-        EventSortType sort = dto.getSort() == null ? EventSortType.EVENT_DATE : dto.getSort();
-        switch (sort) {
-            // views приходят из stats-service и в сущности отсутствуют: до подключения сортируем по дате
-            case VIEWS, EVENT_DATE -> cq.orderBy(cb.asc(root.get("eventDate")));
+        cq.orderBy(cb.asc(root.get("eventDate")));
+
+        TypedQuery<Event> query = entityManager.createQuery(cq);
+        // views приходят из stats-service, поэтому для сортировки по ним нужна вся выборка
+        if (sort != EventSortType.VIEWS) {
+            query.setFirstResult(from).setMaxResults(size);
         }
-
-        // Произвольный offset/size через setFirstResult/setMaxResults
-        int offset = dto.getFrom();
-        int size = dto.getSize();
-
-        List<Event> events = entityManager.createQuery(cq)
-                .setFirstResult(offset)
-                .setMaxResults(size)
-                .getResultList();
-
-        log.debug("Events found: {}", events);
-
-        if (events.isEmpty()) {
-            return List.of();
-        }
-
-        // Получаем статистику
-        List<String> eventsUris = events.stream()
-                .map(event -> requestURI + "/%s" + event.getId().toString())
-                .toList();
-
-        List<StatsResponseDto> stats = statsClient.getStats(GetStatsRequestDto.builder()
-                .uris(eventsUris)
-                .build());
-
-        Map<String, Long> statsMap = stats.stream()
-                .collect(Collectors.toMap(StatsResponseDto::getUri, StatsResponseDto::getHits));
-
-        List<EventShortResponseDto> eventsDto = events.stream()
-                .map(EventMapper::mapEventToEventShortResponseDto)
-                .toList();
-
-        eventsDto.forEach(event ->
-                event.setViews(statsMap.getOrDefault(requestURI + "/" + event.getId(), 0L)));
-
-        // Сохраняем статистику
-        events.forEach(event -> statsClient.saveHit(SaveStatsRequestDto.builder()
-                .app(STATS_APP_NAME)
-                .uri(requestURI + "/" + event.getId())
-                .ip(remoteAddr)
-                .timestamp(LocalDateTime.now())
-                .build())
-        );
-
-        return eventsDto;
+        return query.getResultList();
     }
 
-    @Transactional(readOnly = true)
-    public EventShortResponseDto getPublishedEvent(Long id, String requestURI, String remoteAddr) {
-        log.info("Get published event id={} from uri={} and ip={}", id, requestURI, remoteAddr);
-        Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED).orElseThrow(
-                () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(id)));
+    private Map<String, Long> getViews(List<String> uris) {
+        if (uris.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            List<StatsResponseDto> stats = statsClient.getStats(GetStatsRequestDto.builder()
+                    .start(STATS_START)
+                    .end(LocalDateTime.now())
+                    .uris(uris)
+                    .build());
+            return stats.stream()
+                    .filter(stat -> STATS_APP_NAME.equals(stat.getApp()))
+                    .collect(Collectors.toMap(StatsResponseDto::getUri,
+                            stat -> stat.getHits() == null ? 0L : stat.getHits(),
+                            Long::sum));
+        } catch (StatsClientException ex) {
+            log.warn("Failed to get stats for uris={}: {}", uris, ex.getMessage());
+            return Map.of();
+        }
+    }
 
-        EventShortResponseDto eventDto = EventMapper.mapEventToEventShortResponseDto(event);
+    private void saveHit(String uri, String remoteAddr) {
+        try {
+            statsClient.saveHit(SaveStatsRequestDto.builder()
+                    .app(STATS_APP_NAME)
+                    .uri(uri)
+                    .ip(remoteAddr)
+                    .timestamp(LocalDateTime.now())
+                    .build());
+        } catch (StatsClientException ex) {
+            log.warn("Failed to save hit for uri={}: {}", uri, ex.getMessage());
+        }
+    }
 
-        // Получаем статистику
-        List<StatsResponseDto> eventStatsList = statsClient.getStats(GetStatsRequestDto.builder()
-                .uris(List.of(requestURI))
-                .build());
+    private void validatePublicQuery(QueryEventPublicRequestDto dto) {
+        if (dto.getFrom() < 0) {
+            throw new IllegalRequestParamException("Параметр from не может быть отрицательным");
+        }
+        if (dto.getSize() <= 0) {
+            throw new IllegalRequestParamException("Параметр size должен быть больше 0");
+        }
+        if (dto.getRangeStart() != null && dto.getRangeEnd() != null
+                && dto.getRangeStart().isAfter(dto.getRangeEnd())) {
+            throw new IllegalRequestParamException("rangeStart не может быть позже rangeEnd");
+        }
+    }
 
-        Long eventStats = eventStatsList.isEmpty()? 0L: eventStatsList.getFirst().getHits();
-        eventDto.setViews(eventStats);
-
-        // Сохраняем статистику
-        statsClient.saveHit(SaveStatsRequestDto.builder()
-                .app(STATS_APP_NAME)
-                .uri(requestURI)
-                .ip(remoteAddr)
-                .timestamp(LocalDateTime.now())
-                .build());
-
-        return eventDto;
+    private String buildEventUri(String requestURI, Long eventId) {
+        return requestURI + "/" + eventId;
     }
 
     private Event updateEventByUser(Event event, UpdateEventUserRequestDto dto) {

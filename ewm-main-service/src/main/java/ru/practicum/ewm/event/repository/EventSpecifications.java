@@ -11,9 +11,12 @@ import ru.practicum.ewm.event.model.EventState;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class EventSpecifications {
+    private static final char LIKE_ESCAPE = '\\';
+
     /**
      * Подгружает category и initiator одним запросом (против N+1).
      * Пропускается для count-запроса (Spring Data JPA может вызывать count(spec)).
@@ -75,13 +78,22 @@ public class EventSpecifications {
     // ===== Только для пользователя =====
 
     public static Specification<Event> byText(String text) {
-        return (root, query, cb) ->
-                (text == null || text.isBlank())
-                        ? cb.conjunction()
-                        : cb.or(
-                        cb.like(cb.lower(root.get("annotation")), "%" + text.toLowerCase() + "%"),
-                        cb.like(cb.lower(root.get("description")), "%" + text.toLowerCase() + "%")
-                );
+        return (root, query, cb) -> {
+            if (text == null || text.isBlank()) {
+                return cb.conjunction();
+            }
+            String pattern = "%" + escapeLike(text.toLowerCase(Locale.ROOT)) + "%";
+            return cb.or(
+                    cb.like(cb.lower(root.get("annotation")), pattern, LIKE_ESCAPE),
+                    cb.like(cb.lower(root.get("description")), pattern, LIKE_ESCAPE)
+            );
+        };
+    }
+
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
     }
 
     public static Specification<Event> byPaid(Boolean paid) {

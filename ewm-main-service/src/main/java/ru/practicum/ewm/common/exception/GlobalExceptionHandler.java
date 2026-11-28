@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import ru.practicum.ewm.common.dto.ErrorResponse;
 
 import java.time.LocalDateTime;
@@ -105,6 +106,15 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.METHOD_NOT_ALLOWED,
                 "Метод не поддерживается",
                 ex.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        log.warn("Ресурс не найден: {}", ex.getMessage());
+        log.debug("Ресурс не найден", ex);
+        return createErrorResponse(HttpStatus.NOT_FOUND,
+                "Ресурс не найден",
+                "Запрашиваемый ресурс не найден");
     }
 
     @ExceptionHandler(Exception.class)

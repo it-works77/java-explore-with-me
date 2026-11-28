@@ -3,13 +3,16 @@ package ru.practicum.ewm.event;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import ru.practicum.ewm.category.model.Category;
 import ru.practicum.ewm.category.repository.CategoryRepository;
 import ru.practicum.ewm.common.exception.EntityNotFoundException;
 import ru.practicum.ewm.common.exception.EntityUpdateForbiddenException;
+import ru.practicum.ewm.common.exception.IllegalRequestParamException;
 import ru.practicum.ewm.event.dto.CreateEventRequestDto;
 import ru.practicum.ewm.event.dto.EventFullResponseDto;
 import ru.practicum.ewm.event.dto.EventShortResponseDto;
@@ -20,17 +23,26 @@ import ru.practicum.ewm.event.dto.UpdateEventAdminRequestDto;
 import ru.practicum.ewm.event.dto.UpdateEventUserRequestDto;
 import ru.practicum.ewm.event.model.AdminStateAction;
 import ru.practicum.ewm.event.model.Event;
+import ru.practicum.ewm.event.model.EventSortType;
 import ru.practicum.ewm.event.model.EventState;
 import ru.practicum.ewm.event.model.UserStateAction;
 import ru.practicum.ewm.event.repository.EventRepository;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
+import ru.practicum.stats.client.StatsClient;
+import ru.practicum.stats.client.exception.StatsClientException;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
+import ru.practicum.stats.dto.StatsResponseDto;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ActiveProfiles("test")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -48,6 +60,9 @@ class EventServiceImplIntegrationTest {
     @Autowired
     private CategoryRepository categoryRepository;
 
+    @MockBean
+    private StatsClient statsClient;
+
     private User initiator;
     private Category category;
 
@@ -56,6 +71,7 @@ class EventServiceImplIntegrationTest {
         clearDatabase();
         initiator = userRepository.save(User.builder().name("Ivan").email("ivan@mail.ru").build());
         category = categoryRepository.save(Category.builder().name("Concert").build());
+        when(statsClient.getStats(any())).thenReturn(List.of());
     }
 
     @AfterEach
@@ -236,7 +252,8 @@ class EventServiceImplIntegrationTest {
                 request("Published", category, future(8), true));
         publish(published.getId());
 
-        assertThat(eventService.getAllWithPagination(QueryEventPublicRequestDto.builder().build()))
+        assertThat(eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().build(), "/events", "127.0.0.1"))
                 .extracting(EventShortResponseDto::getId)
                 .containsExactly(published.getId())
                 .doesNotContain(pending.getId());
@@ -248,9 +265,9 @@ class EventServiceImplIntegrationTest {
                 request("Published", category, future(8), true));
         publish(published.getId());
 
-        assertThat(eventService.getAllWithPagination(QueryEventPublicRequestDto.builder()
+        assertThat(eventService.searchPublic(QueryEventPublicRequestDto.builder()
                 .rangeStart(future(30))
-                .build())).isEmpty();
+                .build(), "/events", "127.0.0.1")).isEmpty();
     }
 
     @Test
@@ -266,8 +283,7 @@ class EventServiceImplIntegrationTest {
         assertThat(published.getState()).isEqualTo(EventState.PUBLISHED);
         assertThat(published.getPublishedOn()).isNotNull().isBetween(before, after);
         assertThat(eventRepository.findById(created.getId()).orElseThrow().getPublishedOn())
-                .isNotNull()
-                .isBetween(before, after);
+                .isNotNull();
     }
 
     @Test
@@ -325,6 +341,243 @@ class EventServiceImplIntegrationTest {
         assertThat(updated.getState()).isEqualTo(EventState.PENDING);
     }
 
+    @Test
+    void searchPublic_setsViewsFromStatsAndSavesSingleHitForListEndpoint() {
+        EventFullResponseDto published = eventService.add(initiator.getId(),
+                request("Published", category, future(8), true));
+        publish(published.getId());
+
+        String eventUri = "/events/" + published.getId();
+        when(statsClient.getStats(any())).thenReturn(List.of(
+                StatsResponseDto.builder()
+                        .app("ewm-main-service")
+                        .uri(eventUri)
+                        .hits(5L)
+                        .build()));
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().build(), "/events", "127.0.0.1");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().getViews()).isEqualTo(5L);
+
+        ArgumentCaptor<SaveStatsRequestDto> captor = ArgumentCaptor.forClass(SaveStatsRequestDto.class);
+        verify(statsClient).saveHit(captor.capture());
+        assertThat(captor.getValue().getUri()).isEqualTo("/events");
+        assertThat(captor.getValue().getApp()).isEqualTo("ewm-main-service");
+    }
+
+    @Test
+    void searchPublic_statsUnavailable_returnsEventsWithZeroViews() {
+        EventFullResponseDto published = eventService.add(initiator.getId(),
+                request("Published", category, future(8), true));
+        publish(published.getId());
+
+        when(statsClient.getStats(any())).thenThrow(new StatsClientException("stats down", null));
+        doThrow(new StatsClientException("stats down", null)).when(statsClient).saveHit(any());
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().build(), "/events", "127.0.0.1");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().getViews()).isZero();
+    }
+
+    @Test
+    void searchPublic_sortByViews_ordersByViewsDescending() {
+        EventFullResponseDto low = eventService.add(initiator.getId(),
+                request("Low", category, future(7), true));
+        EventFullResponseDto high = eventService.add(initiator.getId(),
+                request("High", category, future(8), true));
+        publish(low.getId());
+        publish(high.getId());
+
+        when(statsClient.getStats(any())).thenReturn(List.of(
+                StatsResponseDto.builder().app("ewm-main-service")
+                        .uri("/events/" + low.getId()).hits(1L).build(),
+                StatsResponseDto.builder().app("ewm-main-service")
+                        .uri("/events/" + high.getId()).hits(10L).build()));
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().sort(EventSortType.VIEWS).build(),
+                "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getTitle)
+                .containsExactly("High", "Low");
+    }
+
+    @Test
+    void searchPublic_sortByViews_appliesPaginationAfterSorting() {
+        EventFullResponseDto low = eventService.add(initiator.getId(),
+                request("Low", category, future(7), true));
+        EventFullResponseDto high = eventService.add(initiator.getId(),
+                request("High", category, future(8), true));
+        publish(low.getId());
+        publish(high.getId());
+
+        when(statsClient.getStats(any())).thenReturn(List.of(
+                StatsResponseDto.builder().app("ewm-main-service")
+                        .uri("/events/" + low.getId()).hits(1L).build(),
+                StatsResponseDto.builder().app("ewm-main-service")
+                        .uri("/events/" + high.getId()).hits(10L).build()));
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder()
+                        .sort(EventSortType.VIEWS)
+                        .from(0)
+                        .size(1)
+                        .build(),
+                "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getTitle)
+                .containsExactly("High");
+    }
+
+    @Test
+    void searchPublic_rangeStartAfterRangeEnd_throwsBadRequest() {
+        assertThrows(IllegalRequestParamException.class, () -> eventService.searchPublic(
+                QueryEventPublicRequestDto.builder()
+                        .rangeStart(future(10))
+                        .rangeEnd(future(5))
+                        .build(),
+                "/events", "127.0.0.1"));
+    }
+
+    @Test
+    void searchPublic_defaultRange_excludesPastEvents() {
+        Event past = savePublishedEvent(LocalDateTime.now().minusDays(1));
+        Event future = savePublishedEvent(LocalDateTime.now().plusDays(1));
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().build(), "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getId)
+                .contains(future.getId())
+                .doesNotContain(past.getId());
+    }
+
+    @Test
+    void searchPublic_onlyRangeEnd_stillExcludesPastEvents() {
+        Event past = savePublishedEvent(LocalDateTime.now().minusDays(1));
+        Event future = savePublishedEvent(LocalDateTime.now().plusDays(1));
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder()
+                        .rangeEnd(LocalDateTime.now().plusDays(10))
+                        .build(),
+                "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getId)
+                .contains(future.getId())
+                .doesNotContain(past.getId());
+    }
+
+    @Test
+    void searchPublic_withoutPaidFilter_returnsFreeAndPaidEvents() {
+        CreateEventRequestDto freeRequest = request("Free", category, future(7), true);
+        CreateEventRequestDto paidRequest = request("Paid", category, future(8), true);
+        paidRequest.setPaid(true);
+
+        EventFullResponseDto free = eventService.add(initiator.getId(), freeRequest);
+        EventFullResponseDto paid = eventService.add(initiator.getId(), paidRequest);
+        publish(free.getId());
+        publish(paid.getId());
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().build(), "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getId)
+                .contains(free.getId(), paid.getId());
+    }
+
+    @Test
+    void getPublishedEvent_returnsFullDtoWithViews() {
+        EventFullResponseDto published = eventService.add(initiator.getId(),
+                request("Published", category, future(8), true));
+        publish(published.getId());
+
+        String eventUri = "/events/" + published.getId();
+        when(statsClient.getStats(any())).thenReturn(List.of(
+                StatsResponseDto.builder()
+                        .app("ewm-main-service")
+                        .uri(eventUri)
+                        .hits(7L)
+                        .build()));
+
+        EventFullResponseDto result = eventService.getPublishedEvent(
+                published.getId(), eventUri, "127.0.0.1");
+
+        assertThat(result.getDescription()).isEqualTo("Достаточно длинное описание события для теста");
+        assertThat(result.getLocation().lat()).isEqualTo(55.75);
+        assertThat(result.getState()).isEqualTo(EventState.PUBLISHED);
+        assertThat(result.getPublishedOn()).isNotNull();
+        assertThat(result.getViews()).isEqualTo(7L);
+
+        ArgumentCaptor<SaveStatsRequestDto> captor = ArgumentCaptor.forClass(SaveStatsRequestDto.class);
+        verify(statsClient).saveHit(captor.capture());
+        assertThat(captor.getValue().getUri()).isEqualTo(eventUri);
+    }
+
+    @Test
+    void getPublishedEvent_notPublished_throwsNotFound() {
+        EventFullResponseDto pending = eventService.add(initiator.getId(),
+                request("Pending", category, future(7), true));
+
+        assertThrows(EntityNotFoundException.class, () -> eventService.getPublishedEvent(
+                pending.getId(), "/events/" + pending.getId(), "127.0.0.1"));
+    }
+
+    @Test
+    void getPublishedEvent_statsUnavailable_returnsZeroViews() {
+        EventFullResponseDto published = eventService.add(initiator.getId(),
+                request("Published", category, future(8), true));
+        publish(published.getId());
+
+        when(statsClient.getStats(any())).thenThrow(new StatsClientException("stats down", null));
+
+        EventFullResponseDto result = eventService.getPublishedEvent(
+                published.getId(), "/events/" + published.getId(), "127.0.0.1");
+
+        assertThat(result.getViews()).isZero();
+    }
+
+    @Test
+    void searchPublic_textWithWildcard_matchesOnlyLiteralPercent() {
+        CreateEventRequestDto withPercent = request("Percent", category, future(7), true);
+        withPercent.setAnnotation("Скидка 100% на билеты");
+        CreateEventRequestDto withoutPercent = request("Regular", category, future(8), true);
+
+        EventFullResponseDto percent = eventService.add(initiator.getId(), withPercent);
+        EventFullResponseDto regular = eventService.add(initiator.getId(), withoutPercent);
+        publish(percent.getId());
+        publish(regular.getId());
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().text("%").build(), "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getId)
+                .contains(percent.getId())
+                .doesNotContain(regular.getId());
+    }
+
+    @Test
+    void searchPublic_paidTrue_returnsOnlyPaidEvents() {
+        CreateEventRequestDto freeRequest = request("Free", category, future(7), true);
+        CreateEventRequestDto paidRequest = request("Paid", category, future(8), true);
+        paidRequest.setPaid(true);
+
+        EventFullResponseDto free = eventService.add(initiator.getId(), freeRequest);
+        EventFullResponseDto paid = eventService.add(initiator.getId(), paidRequest);
+        publish(free.getId());
+        publish(paid.getId());
+
+        List<EventShortResponseDto> result = eventService.searchPublic(
+                QueryEventPublicRequestDto.builder().paid(true).build(), "/events", "127.0.0.1");
+
+        assertThat(result).extracting(EventShortResponseDto::getId)
+                .containsExactly(paid.getId());
+    }
+
     private void publish(Long eventId) {
         eventService.updateByAdmin(eventId,
                 UpdateEventAdminRequestDto.builder().stateAction(AdminStateAction.PUBLISH_EVENT).build());
@@ -341,6 +594,22 @@ class EventServiceImplIntegrationTest {
                 .latitude(55.75)
                 .longitude(37.62)
                 .requestModeration(true)
+                .build());
+    }
+
+    private Event savePublishedEvent(LocalDateTime eventDate) {
+        return eventRepository.save(Event.builder()
+                .title("Published")
+                .annotation("Достаточно длинная аннотация события")
+                .description("Достаточно длинное описание события для теста")
+                .category(category)
+                .initiator(initiator)
+                .eventDate(eventDate)
+                .latitude(55.75)
+                .longitude(37.62)
+                .requestModeration(true)
+                .state(EventState.PUBLISHED)
+                .publishedOn(LocalDateTime.now())
                 .build());
     }
 

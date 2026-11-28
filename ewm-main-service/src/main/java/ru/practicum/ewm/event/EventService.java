@@ -29,5 +29,5 @@ public interface EventService {
     // Получение списка событий с возможностью фильтрации
     List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto, String requestURI, String remoteAddr);
 
-    EventShortResponseDto getPublishedEvent(@Positive Long id, String requestURI, String remoteAddr);
+    EventFullResponseDto getPublishedEvent(@Positive Long id, String requestURI, String remoteAddr);
 }

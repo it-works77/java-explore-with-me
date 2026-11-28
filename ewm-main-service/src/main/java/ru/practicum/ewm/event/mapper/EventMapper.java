@@ -48,6 +48,8 @@ public class EventMapper {
                 .participantLimit(event.getParticipantLimit())
                 .requestModeration(event.isRequestModeration())
                 .state(event.getState())
+                .confirmedRequests(0L)
+                .views(0L)
                 .createdOn(event.getCreatedOn())
                 .publishedOn(event.getPublishedOn())
                 .build();
@@ -62,6 +64,8 @@ public class EventMapper {
                 .initiator(UserMapper.mapUserToUserShortDto(event.getInitiator()))
                 .eventDate(event.getEventDate())
                 .paid(event.isPaid())
+                .confirmedRequests(0L)
+                .views(0L)
                 .build();
     }
 
@@ -74,6 +78,8 @@ public class EventMapper {
                 .initiator(new UserShortResponseDto(projection.getInitiatorId(), projection.getInitiatorName()))
                 .eventDate(projection.getEventDate())
                 .paid(projection.getPaid())
+                .confirmedRequests(0L)
+                .views(0L)
                 .build();
     }
 }
