@@ -40,7 +40,7 @@ public class EventPrivateController {
     public List<EventShortResponseDto> getAll(@PathVariable @Positive Long userId,
                                               @RequestParam(defaultValue = "0") @PositiveOrZero int from,
                                               @RequestParam(defaultValue = "10") @Positive int size) {
-        return eventService.searchPublic(userId, from, size);
+        return eventService.getAllWithPagination(userId, from, size);
     }
 
     @GetMapping("/{userId}/events/{eventId}")

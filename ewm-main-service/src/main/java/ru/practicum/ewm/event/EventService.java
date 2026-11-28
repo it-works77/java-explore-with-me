@@ -1,5 +1,6 @@
 package ru.practicum.ewm.event;
 
+import jakarta.validation.constraints.Positive;
 import ru.practicum.ewm.event.dto.*;
 
 import java.util.List;
@@ -12,7 +13,7 @@ public interface EventService {
     EventFullResponseDto get(Long userId, Long eventId);
 
     // Получение списка событий, добавленных текущим пользователем
-    List<EventShortResponseDto> searchPublic(Long userId, int from, int size);
+    List<EventShortResponseDto> getAllWithPagination(Long userId, int from, int size);
 
     // Изменение события добавленного текущим пользователем
     EventFullResponseDto update(Long userId, Long eventId, UpdateEventUserRequestDto dto);
@@ -26,8 +27,7 @@ public interface EventService {
 
     // Public
     // Получение списка событий с возможностью фильтрации
-    List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto);
+    List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto, String requestURI, String remoteAddr);
 
-    // Получение подробной информации о событии
-    EventFullResponseDto get(Long eventId);
+    EventShortResponseDto getPublishedEvent(@Positive Long id, String requestURI, String remoteAddr);
 }

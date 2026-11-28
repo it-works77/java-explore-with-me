@@ -5,8 +5,10 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import ru.practicum.ewm.event.model.Event;
+import ru.practicum.ewm.event.model.EventState;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, Long>, JpaSpecificationExecutor<Event> {
 
@@ -34,4 +36,6 @@ public interface EventRepository extends JpaRepository<Event, Long>, JpaSpecific
     List<EventProjection> findAll(@Param("userId") Long userId,
                         @Param("offset") int offset,
                         @Param("size") int size);
+
+    Optional<Event> findByIdAndState(Long id, EventState eventState);
 }

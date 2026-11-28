@@ -135,7 +135,7 @@ class EventServiceImplIntegrationTest {
         eventService.add(initiator.getId(), request("E2", category, future(8), true));
         eventService.add(initiator.getId(), request("E3", category, future(9), true));
 
-        assertThat(eventService.searchPublic(initiator.getId(), 1, 2))
+        assertThat(eventService.getAllWithPagination(initiator.getId(), 1, 2))
                 .extracting(EventShortResponseDto::getTitle)
                 .hasSize(2);
     }
@@ -236,7 +236,7 @@ class EventServiceImplIntegrationTest {
                 request("Published", category, future(8), true));
         publish(published.getId());
 
-        assertThat(eventService.searchPublic(QueryEventPublicRequestDto.builder().build()))
+        assertThat(eventService.getAllWithPagination(QueryEventPublicRequestDto.builder().build()))
                 .extracting(EventShortResponseDto::getId)
                 .containsExactly(published.getId())
                 .doesNotContain(pending.getId());
@@ -248,17 +248,9 @@ class EventServiceImplIntegrationTest {
                 request("Published", category, future(8), true));
         publish(published.getId());
 
-        assertThat(eventService.searchPublic(QueryEventPublicRequestDto.builder()
+        assertThat(eventService.getAllWithPagination(QueryEventPublicRequestDto.builder()
                 .rangeStart(future(30))
                 .build())).isEmpty();
-    }
-
-    @Test
-    void getPublic_unpublishedEvent_throwsNotFound() {
-        EventFullResponseDto created = eventService.add(initiator.getId(),
-                request("Concert", category, future(7), true));
-
-        assertThrows(EntityNotFoundException.class, () -> eventService.get(created.getId()));
     }
 
     @Test

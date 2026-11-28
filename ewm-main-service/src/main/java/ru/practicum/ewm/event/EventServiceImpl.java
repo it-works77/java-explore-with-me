@@ -27,9 +27,15 @@ import ru.practicum.ewm.event.repository.EventRepository;
 import ru.practicum.ewm.event.repository.EventSpecifications;
 import ru.practicum.ewm.user.model.User;
 import ru.practicum.ewm.user.repository.UserRepository;
+import ru.practicum.stats.client.StatsClient;
+import ru.practicum.stats.dto.GetStatsRequestDto;
+import ru.practicum.stats.dto.SaveStatsRequestDto;
+import ru.practicum.stats.dto.StatsResponseDto;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -37,9 +43,11 @@ import java.util.List;
 public class EventServiceImpl implements EventService {
     private static final int MIN_HOURS_BEFORE_EVENT_DATE = 2;
     private static final int MIN_ADMIN_HOURS_BEFORE_EVENT_DATE = 1;
+    private static final String STATS_APP_NAME = "ewm-main-service";
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final StatsClient statsClient;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -83,7 +91,7 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<EventShortResponseDto> searchPublic(Long userId, int offset, int size) {
+    public List<EventShortResponseDto> getAllWithPagination(Long userId, int offset, int size) {
         log.info("Get all events for user id={} with pagination: offset={}, size={}", userId, offset, size);
         List<EventProjection> eventProjections = eventRepository.findAll(userId, offset, size);
         return eventProjections.stream()
@@ -176,7 +184,9 @@ public class EventServiceImpl implements EventService {
     // Public
     @Override
     @Transactional(readOnly = true)
-    public List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto) {
+    public List<EventShortResponseDto> searchPublic(QueryEventPublicRequestDto dto,
+                                                    String requestURI,
+                                                    String remoteAddr) {
         log.info("Get all events");
 
         Specification<Event> spec = EventSpecifications.combineForUser(dto)
@@ -210,23 +220,68 @@ public class EventServiceImpl implements EventService {
                 .setMaxResults(size)
                 .getResultList();
 
-        return events.stream()
-                .map(EventMapper::mapEventToEventShortResponseDto)
-                .toList();
-    }
+        log.debug("Events found: {}", events);
 
-    @Override
-    @Transactional(readOnly = true)
-    public EventFullResponseDto get(Long eventId) {
-        log.info("Get event id={}", eventId);
-        Event event = eventRepository.findById(eventId).orElseThrow(
-                () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(eventId)));
-        if (event.getState() != EventState.PUBLISHED) {
-            throw new EntityNotFoundException("Событие не найдено по id=%s".formatted(eventId));
+        if (events.isEmpty()) {
+            return List.of();
         }
 
-        log.debug("Event found: {}", event);
-        return EventMapper.mapEventToEventFullResponseDto(event);
+        // Получаем статистику
+        List<String> eventsUris = events.stream()
+                .map(event -> requestURI + "/%s" + event.getId().toString())
+                .toList();
+
+        List<StatsResponseDto> stats = statsClient.getStats(GetStatsRequestDto.builder()
+                .uris(eventsUris)
+                .build());
+
+        Map<String, Long> statsMap = stats.stream()
+                .collect(Collectors.toMap(StatsResponseDto::getUri, StatsResponseDto::getHits));
+
+        List<EventShortResponseDto> eventsDto = events.stream()
+                .map(EventMapper::mapEventToEventShortResponseDto)
+                .toList();
+
+        eventsDto.forEach(event ->
+                event.setViews(statsMap.getOrDefault(requestURI + "/" + event.getId(), 0L)));
+
+        // Сохраняем статистику
+        events.forEach(event -> statsClient.saveHit(SaveStatsRequestDto.builder()
+                .app(STATS_APP_NAME)
+                .uri(requestURI + "/" + event.getId())
+                .ip(remoteAddr)
+                .timestamp(LocalDateTime.now())
+                .build())
+        );
+
+        return eventsDto;
+    }
+
+    @Transactional(readOnly = true)
+    public EventShortResponseDto getPublishedEvent(Long id, String requestURI, String remoteAddr) {
+        log.info("Get published event id={} from uri={} and ip={}", id, requestURI, remoteAddr);
+        Event event = eventRepository.findByIdAndState(id, EventState.PUBLISHED).orElseThrow(
+                () -> new EntityNotFoundException("Событие не найдено по id=%s".formatted(id)));
+
+        EventShortResponseDto eventDto = EventMapper.mapEventToEventShortResponseDto(event);
+
+        // Получаем статистику
+        List<StatsResponseDto> eventStatsList = statsClient.getStats(GetStatsRequestDto.builder()
+                .uris(List.of(requestURI))
+                .build());
+
+        Long eventStats = eventStatsList.isEmpty()? 0L: eventStatsList.getFirst().getHits();
+        eventDto.setViews(eventStats);
+
+        // Сохраняем статистику
+        statsClient.saveHit(SaveStatsRequestDto.builder()
+                .app(STATS_APP_NAME)
+                .uri(requestURI)
+                .ip(remoteAddr)
+                .timestamp(LocalDateTime.now())
+                .build());
+
+        return eventDto;
     }
 
     private Event updateEventByUser(Event event, UpdateEventUserRequestDto dto) {

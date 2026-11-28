@@ -92,17 +92,17 @@ class EventPrivateControllerTest {
 
     @Test
     void getAll_withoutParams_usesDefaults() throws Exception {
-        when(eventService.searchPublic(1L, 0, 10)).thenReturn(List.of());
+        when(eventService.getAllWithPagination(1L, 0, 10)).thenReturn(List.of());
 
         mockMvc.perform(get("/users/1/events"))
                 .andExpect(status().isOk());
 
-        verify(eventService).searchPublic(1L, 0, 10);
+        verify(eventService).getAllWithPagination(1L, 0, 10);
     }
 
     @Test
     void getAll_withExplicitParams_passesThem() throws Exception {
-        when(eventService.searchPublic(1L, 5, 2))
+        when(eventService.getAllWithPagination(1L, 5, 2))
                 .thenReturn(List.of(EventShortResponseDto.builder().id(6L).title("E6").build()));
 
         mockMvc.perform(get("/users/1/events").param("from", "5").param("size", "2"))
@@ -110,7 +110,7 @@ class EventPrivateControllerTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].title").value("E6"));
 
-        verify(eventService).searchPublic(1L, 5, 2);
+        verify(eventService).getAllWithPagination(1L, 5, 2);
     }
 
     @Test
@@ -118,7 +118,7 @@ class EventPrivateControllerTest {
         mockMvc.perform(get("/users/1/events").param("from", "-1"))
                 .andExpect(status().isBadRequest());
 
-        verify(eventService, never()).searchPublic(any(), anyInt(), anyInt());
+        verify(eventService, never()).getAllWithPagination(any(), anyInt(), anyInt());
     }
 
     @Test
@@ -126,7 +126,7 @@ class EventPrivateControllerTest {
         mockMvc.perform(get("/users/1/events").param("size", "0"))
                 .andExpect(status().isBadRequest());
 
-        verify(eventService, never()).searchPublic(any(), anyInt(), anyInt());
+        verify(eventService, never()).getAllWithPagination(any(), anyInt(), anyInt());
     }
 
     @Test
