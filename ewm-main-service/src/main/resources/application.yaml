@@ -1,0 +1,37 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ewm-main-service
+  main.banner-mode: OFF
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+
+  sql:
+    init:
+      mode: always
+
+  datasource:
+    username: "dbuser"
+    password: "Qwerty$4"
+    url: "jdbc:postgresql://localhost:5432/ewm_main"
+    driver-class-name: "org.postgresql.Driver"
+
+logging:
+  level:
+    root: INFO
+    ru.practicum.ewm: INFO
+    org.springframework.orm.jpa: INFO
+    org.springframework.transaction: INFO
+
+stats-service:
+  url: ${STATS_SERVICE_URL:http://localhost:9090}
+  connect-timeout: ${STATS_SERVICE_CONNECT_TIMEOUT:3s}
+  read-timeout: ${STATS_SERVICE_READ_TIMEOUT:5s}

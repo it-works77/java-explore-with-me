@@ -1,0 +1,46 @@
+package ru.practicum.ewm.event.dto;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import ru.practicum.ewm.event.model.EventSortType;
+import ru.practicum.stats.api.StatsApiConfig;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class QueryEventPublicRequestDto {
+    @Size(min = 1, max = 7000)
+    private String text;
+
+    private List<Long> categories;
+
+    private Boolean paid;
+
+    @JsonFormat(pattern = StatsApiConfig.DATE_TIME_PATTERN)
+    private LocalDateTime rangeStart;
+
+    @JsonFormat(pattern = StatsApiConfig.DATE_TIME_PATTERN)
+    private LocalDateTime rangeEnd;
+
+    private Boolean onlyAvailable;
+
+    private EventSortType sort;
+
+    @PositiveOrZero
+    @Builder.Default
+    private int from = 0;
+
+    @Positive
+    @Builder.Default
+    private int size = 10;
+}
